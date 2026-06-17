@@ -1,292 +1,55 @@
-import os
-from google import genai
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <title>BetMaster Pro 2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="importmap">
+        { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
+    </script>
+    <style>body { background-color: #0f172a; color: white; }</style>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl font-bold mb-6 text-emerald-500">BetMaster Pro 2.0</h1>
+        
+        <div class="bg-gray-900 p-6 rounded-xl border border-gray-700 mb-8">
+            <label class="block text-lg mb-4">Carregar Print de Jogo:</label>
+            <input type="file" id="imageInput" accept="image/*" class="w-full p-3 bg-gray-800 rounded">
+            <button id="analyzeBtn" class="mt-4 w-full bg-emerald-600 p-3 rounded font-bold hover:bg-emerald-500">ANALISAR AGORA</button>
+        </div>
 
-client = genai.Client(
-    api_key=os.environ.get("GEMINI_API_KEY"),
-)
+        <div id="result" class="bg-gray-800 p-6 rounded-xl border border-emerald-500/30 hidden">
+            <h2 class="text-2xl font-bold mb-4">Análise Estatística:</h2>
+            <div id="output" class="text-gray-300 whitespace-pre-line"></div>
+        </div>
+    </div>
 
-tools = [
-    {
-        'type': 'code_execution',
-    },
-    {
-        'type': 'google_search',
-    },
-    {
-        'type': 'url_context',
-    },
-]
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+        
+        // A Vercel injeta a variável de ambiente automaticamente
+        const API_KEY = process.env.GEMINI_API_KEY; 
+        const genAI = new GoogleGenerativeAI(API_KEY);
 
-interaction = client.interactions.create(
-    agent='antigravity-preview-05-2026',
-    input='',
-    system_instruction='Tu és o BetMaster Live Engine 2.0. A tua função é realizar análises estatísticas em tempo real para apostas desportivas.
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const file = document.getElementById('imageInput').files[0];
+            if (!file) return alert("Escolhe uma imagem!");
 
-REGRAS DE OURO:
+            document.getElementById('result').classList.remove('hidden');
+            document.getElementById('output').innerText = "A analisar em tempo real com Google Search...";
 
-VALIDACAO REAL: Sempre que um jogo for mencionado ou enviado por imagem, usa o 'Google Search' para verificar o estado real do jogo em sites oficiais de resultados (Flashscore/Sofascore). Se não encontrares o jogo, diz: 'Jogo não encontrado em tempo real'. Nunca inventes resultados.
-
-ANALISE DE IMAGEM: Ao receberes um print, extrai os nomes das equipas, minuto e placar. Cruza estes dados com a internet antes de emitir qualquer parecer.
-
-METRICA DE DADOS: Apresenta a probabilidade baseada na forma atual dos últimos 5 jogos e histórico H2H.
-
-RESULTADO: Fornece uma TIP clara (ex: Over 0.5 Golo, 1X2, etc.) com o nível de confiança (0-100%).
-
-AVISO: Termina sempre com o aviso de risco financeiro.',
-    tools=tools,
-    environment={
-        'type': 'remote',
-        'network': {
-            'allowlist': [
-                {
-                    'domain': 'github.com',
-                },
-                {
-                    'domain': 'pypi.org',
-                },
-                {
-                    'domain': 'files.pythonhosted.org',
-                }
-            ]
-        },
-        'sources': [
-            {
-                'type': 'inline',
-                'target': '/.agents/AGENTS.md',
-                'content': '# AGENTS.md — Data Analyst
-
-You are an expert data analyst working in a sandboxed Linux environment with full Python, shell, and web access to a set of allowlisted domains. You focus on business intelligence and data analysis using the Northwind dataset. You answer complex business questions autonomously using Python, Pandas, and scikit-learn.
-
-## Workspace
-
-All work is performed in the `.agents/workspace` directory. All paths are relative to `.agents/workspace` unless absolute.
-
----
-
-## Before You Do Anything
-
-1. Immediately install required libraries:
-   ```bash
-   pip install -r /.agents/requirements.txt --break-system-packages
-   ```
-
----
-
-## Workflow
-
-> [!IMPORTANT]
-> **Bias for Action**: Do NOT ask for approval before executing commands, running scripts, or proceeding to the next step. Proceed autonomously unless there is a material ambiguity or a critical decision that strictly requires user input.
-
-> [!TIP]
-> **Maximize Speed & Reduce Calls**:
-> - Do not use `list_files` to verify directories, script paths, or output files—trust the documentation and the script success logs.
-> - Chain sequential bash commands using `&&` in a single tool call.
-
-The Data Analyst is a highly interactive, conversational assistant. Rather than executing a rigid chain of scripts, you must operate on-demand based strictly on the user's specific request and guide them through their data analysis.
-
-The workspace is **natively pre-bootstrapped at start-up with a cleaned, properly formatted Northwind dataset** loaded directly into `.agents/workspace/northwind/`. You do not need to download or clone files.
-
-Follow this conversational lifecycle:
-
-1. **Respond to Queries**: Read the user's prompt and respond to their questions using the pre-loaded data:
-   - If they ask general questions about the data, write local Python code to load and analyze it directly.
-   - Print computed results directly to the user as clear structured text or clean markdown tables.
-   - **Proactive momentum**: Once you have answered the user's initial question, always proactively suggest 2-3 specific, contextual follow-up questions or analyses they might want to run (e.g., offering statistical forecasting, supplier-impact analysis, top category deep-dives, or anomaly checks).
-2. **Explore and Profile**: Use the `data-explorer` skill to profile the dataset and understand schemas, data types, nulls, and duplicate records.
-3. **Advanced Modeling**: If asked to predict (e.g., \"Predict next month's revenue\") or identify patterns, write custom Python scripts using `scikit-learn` or `statsmodels` to compute model metrics and return structured insights.
-
----
-
-## Architecture
-
-```
-Workspace Bootstrapping (Done automatically by the platform at start-up from GCS)
-  → Clean, standard-compliant Northwind CSV files pre-loaded in .agents/workspace/northwind/
-
-User prompt
-  ├── 1. (On-Demand Data Profiling) Run python script using pandas
-  │       → Generates structured JSON data profiles and schema recommendations
-  └── 2. (On-Demand Analysis) Run custom python scripts using pandas / scikit-learn
-          → Performs joins, aggregations, stats, and builds ML models
-          → Presents clear, structured text tables and insights directly to the user
-```
-
----
-
-## Skills
-
-Each skill lives in `/.agents/skills/<name>/` with a `SKILL.md` (and optional helper scripts).
-
-| Skill | Script(s) | Purpose |
-|-------|-----------|---------|
-| `data-explorer` | *(No script — prompt-based)* | Profile tabular datasets and understand schemas, quality, and duplicate records |
-| `python-data` | *(No script — prompt-based)* | Run complex calculations, regressions, and ML models using pandas and scikit-learn |
-
----
-
-## Execution Rules
-
-- **Conversational Greetings**: If the user sends a simple greeting or conversational message (e.g., \"Hello,\" \"Hi,\" \"How are you?\"), do NOT execute any code, run any scripts, or make any tool calls. Simply reply directly in chat with a friendly welcome message, summarize your capabilities, and ask how you can help.
-- **Strictly On-Demand**: Never run scripts or generate reports unless the user explicitly requests them.
-- **No Hallucinations on Empty Outputs**: If a bash command or Python pandas execution returns blank output, an error, or a `FileNotFoundError`, do NOT assume the files exist or hallucinate their schemas/contents from memory. If you get empty output, investigate the directory structure and resolve the file locations immediately.
-- **Incremental Progress**: Build on top of existing data. Always use the pre-loaded CSV files under `.agents/workspace/northwind/` as your source of truth.
-- **Primary Output**: Prioritize text and markdown tables for direct answers in chat. You can generate and save charts to the workspace if requested.
-- **Conversational Momentum**: Always maintain conversational momentum. Whenever you complete an analytical sub-step, profile a file, or answer a question, do not simply print a markdown table and go silent. Proactively offer the next logical step (e.g., if you calculated sales statistics, offer to build a predictive scikit-learn model, analyze regional trends, or check for outliers). Always provide 2-3 specific, contextual options for how the user can deepen their analysis.
-
----
-
-## File Locations
-
-| What | Path |
-|------|------|
-| Workspace data directory | `.agents/workspace/northwind/` |
-| Customers database | `.agents/workspace/northwind/customers.csv` |
-| Orders database | `.agents/workspace/northwind/orders.csv` |
-| Order Details database | `.agents/workspace/northwind/order-details.csv` |
-| Products database | `.agents/workspace/northwind/products.csv` |
-| Categories database | `.agents/workspace/northwind/categories.csv` |
-| Suppliers database | `.agents/workspace/northwind/suppliers.csv` |
-| Employees database | `.agents/workspace/northwind/employees.csv` |
-| Shippers database | `.agents/workspace/northwind/shippers.csv` |
-| Regions database | `.agents/workspace/northwind/regions.csv` |
-| Territories database | `.agents/workspace/northwind/territories.csv` |
-| Employee Territories | `.agents/workspace/northwind/employee-territories.csv` |
-
----
-
-## Edge Cases
-
-- **Corrupted or missing columns**: Log warnings and handle missing or malformed data gracefully.
-- **Empty datasets**: Terminate gracefully with an informative message.
-',
-            },
-            {
-                'type': 'inline',
-                'target': '/.agents/requirements.txt',
-                'content': 'pandas>=2.0.0
-numpy>=1.20.0
-requests>=2.28.0
-scikit-learn>=1.0.0
-statsmodels>=0.13.0
-',
-            },
-            {
-                'type': 'inline',
-                'target': '/.agents/skills/data-explorer/SKILL.md',
-                'content': '---
-name: data-explorer
-description: >-
-  General-purpose data profiling and exploration. Use when first encountering
-  any dataset to understand its structure, quality, and analysis potential.
----
-
-# Data explorer skill
-
-Profile any tabular dataset (CSV, JSON, Parquet) and produce a structured
-summary the other skills can consume.
-
-## Workflow
-
-1. **Scan workspace**: list all data files in the workspace directory.
-2. **Load and profile each file**:
-   - Row count, column count
-   - Column names, data types, null counts, unique counts
-   - Basic statistics (min, max, mean, median, std for numerics)
-   - Value counts for categorical columns (top 10)
-   - Correlation matrix for numeric columns
-3. **Assess data quality**:
-   - Missing value percentage per column
-   - Potential data type issues (e.g., numbers stored as strings)
-   - Duplicate row detection
-   - Outlier detection (IQR method)
-4. **Output a structured profile** as JSON for downstream skills.
-5. **Recommend analysis directions** based on what you found.
-
-## Output format
-
-```json
-{
-  \"files\": [
-    {
-      \"filename\": \"customers.csv\",
-      \"rows\": 91,
-      \"columns\": 7,
-      \"schema\": [
-        {\"name\": \"CustomerID\", \"dtype\": \"object\", \"nulls\": 0, \"unique\": 91},
-        {\"name\": \"CompanyName\", \"dtype\": \"object\", \"nulls\": 0, \"unique\": 91}
-      ],
-      \"quality\": {
-        \"missing_pct\": {\"Region\": 0.60},
-        \"duplicates\": 0
-      },
-      \"recommendations\": [
-        \"CustomerID is a unique string identifier\",
-        \"Region column has a high missing percentage (60%)\",
-        \"Can be joined with orders.csv on CustomerID to analyze customer behavior\"
-      ]
-    }
-  ]
-}
-```
-
-## Key rules
-
-- Never assume a specific dataset. Profile whatever is present.
-- If no data files are found, inform the user and ask them to upload.
-- Use `pandas` for profiling. It is pre-installed in the sandbox.
-- Use `select_dtypes(include=[\"object\", \"str\"])` for categorical columns.
-- For large files (>100K rows), profile a sample first and note the sampling.
-',
-            },
-            {
-                'type': 'inline',
-                'target': '/.agents/skills/python-data/SKILL.md',
-                'content': '---
-name: python-data
-description: Performs heavy numerical compute and statistical analysis inside the sandbox.
----
-
-# Python data skill
-
-Run complex calculations, regressions, and aggregations using pandas and
-scikit-learn in the sandbox.
-
-## Workflow
-
-1. **Write a Python script** using `pandas`, `numpy`, or `sklearn` to:
-   - Join, filter, and aggregate tables.
-   - Compute statistics (mean, median, stddev, correlations).
-   - Build or evaluate ML models.
-   - Run statistical tests (chi-square, t-test) when appropriate.
-2. **Execute in the sandbox.** Run via `python3 script.py`.
-3. **Handle errors.** If the code fails, read the traceback and fix it.
-4. **Return structured output.** Print results as JSON for downstream skills.
-
-## Example output
-
-```json
-[
-  {\"segment\": \"High Risk\", \"churn_rate\": 0.34, \"avg_tenure\": 2.1},
-  {\"segment\": \"Low Risk\",  \"churn_rate\": 0.05, \"avg_tenure\": 14.7}
-]
-```
-
-## Notes
-
-- Use `select_dtypes(include=[\"object\", \"str\"])` for categorical columns
-  (avoids the pandas 4 deprecation warning).
-- Install missing packages with `pip install -q <package>` before importing.
-',
-            },
-            {
-                'type': 'gcs',
-                'source': 'gs://generativeai-downloads/managed-agents-templates/data-analyst',
-                'target': '.agents/workspace',
-            },
-        ],
-    },
-)
-
-print(interaction.steps[-1])
-
-
+            // Lógica de leitura de imagem e envio para o Gemini
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const prompt = "Tu és o BetMaster 2.0. Analisa esta imagem de jogo, cruza com dados reais do Google Search e dá uma tip com EV+.";
+                
+                const result = await model.generateContent([prompt, { inlineData: { data: reader.result.split(',')[1], mimeType: file.type } }]);
+                document.getElementById('output').innerText = result.response.text();
+            };
+            reader.readAsDataURL(file);
+        });
+    </script>
+</body>
+</html>
