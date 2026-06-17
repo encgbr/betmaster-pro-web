@@ -1,76 +1,30 @@
 <!DOCTYPE html>
-<html lang="pt-PT">
-<head>
-    <meta charset="UTF-8">
-    <title>BetMaster Pro 2.0</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-        { "imports": { "@google/generative-ai": "https://esm.run/@google/generative-ai" } }
-    </script>
-    <style>body { background-color: #0f172a; color: white; }</style>
-</head>
-<body class="p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-        <h1 class="text-3xl font-bold mb-6 text-emerald-500">BetMaster Pro 2.0</h1>
-        
-        <div class="bg-gray-900 p-6 rounded-xl border border-gray-700 mb-8">
-            <label class="block mb-2">Escrever nome do jogo:</label>
-            <input type="text" id="gameInput" placeholder="Ex: FC Porto vs Benfica" class="w-full p-3 bg-gray-800 rounded border border-gray-600 mb-4">
-            
-            <label class="block mb-2">Ou carregar/colar print (Ctrl+V):</label>
-            <input type="file" id="imageInput" accept="image/*" class="w-full p-3 bg-gray-800 rounded border border-gray-600 mb-4">
-            
-            <button id="analyzeBtn" class="w-full bg-emerald-600 p-4 rounded font-bold text-lg hover:bg-emerald-500 transition">ANALISAR JOGO AGORA</button>
-        </div>
-
-        <div id="result" class="bg-gray-800 p-6 rounded-xl border border-emerald-500/30 hidden">
-            <h2 class="text-xl font-bold mb-4 text-emerald-400">Resultado da Análise:</h2>
-            <div id="output" class="text-gray-200 leading-relaxed whitespace-pre-line"></div>
-        </div>
-    </div>
+<html>
+<body>
+    <h1>BetMaster Pro</h1>
+    <input type="text" id="game" placeholder="Nome do jogo">
+    <button onclick="analyze()">Analisar</button>
+    <div id="res"></div>
 
     <script type="module">
-        import { GoogleGenerativeAI } from "@google/generative-ai";
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
         
-        // Coloca aqui a tua chave API se a Vercel falhar na variável de ambiente
-        const API_KEY = "AIzaSyBu65Z32wui_GyhJQVqm5T8gVlwMUzdD-8";
-        const genAI = new GoogleGenerativeAI(API_KEY);
-
-        // Suporte para Colar Imagem (Ctrl+V)
-        window.addEventListener('paste', e => {
-            const file = e.clipboardData.files[0];
-            if (file) document.getElementById('imageInput').files = e.clipboardData.files;
-        });
-
-        document.getElementById('analyzeBtn').addEventListener('click', async () => {
-            const gameText = document.getElementById('gameInput').value;
-            const file = document.getElementById('imageInput').files[0];
+        window.analyze = async () => {
+            const resDiv = document.getElementById('res');
+            resDiv.innerText = "A analisar...";
             
-            if (!gameText && !file) return alert("Por favor, insere o nome do jogo ou carrega um print.");
-
-            document.getElementById('result').classList.remove('hidden');
-            document.getElementById('output').innerText = "A processar análise com Google Search...";
-
             try {
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-                let prompt = `Analisa este jogo: ${gameText || 'Baseia-te apenas na imagem.'}. Fornece uma análise estatística de valor (EV+) baseada em factos reais.`;
+                // A tua chave real aqui
+                const genAI = new GoogleGenerativeAI("AIzaSyBu65Z32wui_GyhJQVqm5T8gVlwMUzdD-8"); 
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const prompt = "Analisa o jogo: " + document.getElementById('game').value + ". Dá uma tip com valor.";
                 
-                let params = [prompt];
-                if (file) {
-                    const base64Data = await new Promise(r => {
-                        const reader = new FileReader();
-                        reader.onload = () => r(reader.result.split(',')[1]);
-                        reader.readAsDataURL(file);
-                    });
-                    params.push({ inlineData: { data: base64Data, mimeType: file.type } });
-                }
-                
-                const result = await model.generateContent(params);
-                document.getElementById('output').innerText = result.response.text();
-            } catch (err) {
-                document.getElementById('output').innerText = "Erro ao processar: " + err.message;
+                const result = await model.generateContent(prompt);
+                resDiv.innerText = result.response.text();
+            } catch (e) {
+                resDiv.innerText = "Erro: " + e.message;
             }
-        });
+        }
     </script>
 </body>
 </html>
