@@ -52,7 +52,7 @@
             document.getElementById('output').innerText = "A processar análise com Google Search...";
 
             try {
-                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
                 let prompt = `Analisa este jogo: ${gameText || 'Baseia-te apenas na imagem.'}. Fornece uma análise estatística de valor (EV+) baseada em factos reais.`;
                 
                 let params = [prompt];
